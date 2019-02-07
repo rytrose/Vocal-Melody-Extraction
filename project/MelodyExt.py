@@ -6,7 +6,6 @@ Created on Fri Aug 25 21:54:18 2017
 """
 import os 
 import sys
-sys.path.append("/Library/Frameworks/Python.framework/Versions/3.6/lib/python3.6/site-packages")
 import soundfile as sf
 import numpy as np
 import scipy 

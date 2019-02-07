@@ -1,5 +1,13 @@
 import numpy as np
 from keras.models import model_from_json, model_from_yaml
+
+import tensorflow as tf
+from keras.backend.tensorflow_backend import set_session
+config = tf.ConfigProto()
+config.gpu_options.allow_growth = True  # dynamically grow the memory used on the GPU
+sess = tf.Session(config=config)
+set_session(sess)  # set this TensorFlow session as the default session for Keras
+
 from mir_eval import melody
 
 TIMESTEP = 128
@@ -95,6 +103,7 @@ def load_model(model_name):
 
 
     """
+    print("About to load model.")
     ext = '.yaml'
     model = model_from_yaml(open(model_name + ext).read())
     model.load_weights(model_name + '_weights.h5')

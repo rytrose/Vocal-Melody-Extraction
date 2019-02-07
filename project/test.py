@@ -32,19 +32,32 @@ def inference(feature,
               feature_num_48=384,
               channel=1):
 
+    print("Begin inference processing, batch size: %d" % batch_size)
+
     f_12 = note_res_downsampling(feature)
+    print("Downsampled.")
+
     f_12_p = padding(f_12, feature_num_12, timestep)
+    print("Padded.")
+
     f_12_s = np.zeros((f_12_p.shape[0], timestep, f_12_p.shape[1]))
+    print("Zeros.")
 
     f_48_p, p_t, p_b = padding(feature, feature_num_48, timestep, dimension=True)
+    print("Padded again.")
+
     f_48_s = np.zeros((f_48_p.shape[0], timestep, f_48_p.shape[1]))
+    print("More zeros.")
 
     for i in range(len(f_12_s) - timestep):
         f_12_s[i] = f_12_p[i:i + timestep]
         f_48_s[i] = f_48_p[i:i + timestep]
 
     extract_result_seg = np.zeros(f_48_s.shape + (2,))
+    print("Still more zeros.")
+
     extract_result_seg_flatten = np.zeros(f_48_p.shape + (2,))
+    print("YA more zeroes.")
 
     iter_num = int(np.ceil(((len(f_12_s) - timestep) / batch_size)))
 
