@@ -1,12 +1,19 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import pretty_midi as pm
+import pickle
 
 if __name__ == '__main__':
     midi = pm.PrettyMIDI('casey_jones.mid')
-    data = np.loadtxt("out_seg.txt")
-    data = data[:, 1]
-    np.place(data, data == 0, np.nan)
+
+    melodia_data = pickle.load(open('melodia_out.p', 'rb'))
+    _, melodia_data = melodia_data['vector']
+    np.place(melodia_data, melodia_data <= 0, np.nan)
+    melodia_timestamps = 8 * 128 / 44100.0 + np.arange(len(melodia_data)) * (128 / 44100.0)
+
+    cnn_data = np.loadtxt("out_seg.txt")
+    cnn_data = cnn_data[:, 1]
+
 
     start_stops = [[n.start, n.end] for n in midi.instruments[0].notes]
 
@@ -27,14 +34,12 @@ if __name__ == '__main__':
         time.append(t)
         t += 0.1
 
-    data_interp = np.interp(time, np.linspace(0, length, data.shape[0]), data)
+    midi_data_interp = np.interp(melodia_timestamps, time, midi_freqs)
+    cnn_data_interp = np.interp(melodia_timestamps, np.linspace(0, length, cnn_data.shape[0]), cnn_data)
+    np.place(cnn_data_interp, cnn_data_interp <= 4000, np.nan)
 
-    plt.plot(time, data_interp)
-    plt.plot(time, midi_freqs)
-    plt.legend(['Interpolated to Seconds DL', 'MIDI'])
-    plt.show()
-
-    plt.plot(np.linspace(0, 1, data.shape[0]), data)
-    plt.plot(np.linspace(0, 1, len(time)), midi_freqs)
-    plt.legend(['DL', 'MIDI'])
+    plt.plot(melodia_timestamps, melodia_data)
+    plt.plot(melodia_timestamps, cnn_data_interp)
+    plt.plot(melodia_timestamps, midi_data_interp)
+    plt.legend(['Melodia', 'CNN', 'MIDI'])
     plt.show()
