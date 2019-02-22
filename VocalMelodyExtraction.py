@@ -1,12 +1,16 @@
 import argparse
 
 import numpy as np
+import soundfile as sf
 
 from project.MelodyExt import feature_extraction
 from project.utils import load_model, save_model, matrix_parser
 from project.test import inference
 from project.model import seg, seg_pnn, sparse_loss
 from project.train import train_audio
+
+# Only run 10s at a time
+MAX_LEN = 44100 * 10
 
 def main():
     # Arguments
@@ -59,6 +63,9 @@ def main():
     parser.add_argument('-bb', '--batch_size_test',
                         help='batch size during testing (default: %(default)s',
                         type=int, default=10)
+    parser.add_argument('-of', '--output_file',
+                        help='output file name (default: %(default)s',
+                        type=str, default='out_seg')
 
     args = parser.parse_args()
     print(args)
@@ -96,24 +103,37 @@ def main():
     else:
         # load wav
         song = args.input_file
+        x, fs = sf.read(song)
+        results = None
+        sample_ptr = 0
+        while sample_ptr < x.shape[0]:
+            chunk_end = min(sample_ptr + MAX_LEN, x.shape[0] - 1)
+            chunk = x[sample_ptr:chunk_end, :]
+            sample_ptr += MAX_LEN
 
-        # Feature extraction
-        feature = feature_extraction(song)
-        feature = np.transpose(feature[0:4], axes=(2, 1, 0))
+            # Feature extraction
+            feature = feature_extraction(chunk, fs)
+            feature = np.transpose(feature[0:4], axes=(2, 1, 0))
 
-        # load model
-        model = load_model(args.model_path)
+            # load model
+            model = load_model(args.model_path)
 
-        # Inference
-        print(feature[:, :, 0].shape)
-        extract_result = inference(feature= feature[:, :, 0],
-                                   model = model,
-                                   batch_size=args.batch_size_test)
+            # Inference
+            print(feature[:, :, 0].shape)
+            extract_result = inference(feature= feature[:, :, 0],
+                                       model = model,
+                                       batch_size=args.batch_size_test)
 
-        # Output
-        r = matrix_parser(extract_result)
+            # Output
+            r = matrix_parser(extract_result)
 
-        np.savetxt("out_seg.txt", r)
+            if results is None:
+                results = r
+            else:
+                results = np.concatenate((results, r))
+
+            np.savetxt(args.output_file + ".txt", results)
+        print("FINISHED")
 
 
 if __name__ == '__main__':

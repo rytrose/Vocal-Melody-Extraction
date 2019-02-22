@@ -93,7 +93,8 @@ def matrix_parser(m):
             x[i][0] = 1
             x[i][1] = midi2freq(np.argmax(m[i]) / 4 + 21)
 
-    x[:, 1] = melody.hz2cents(x[:, 1])
+    # Make it return Hz
+    # x[:, 1] = melody.hz2cents(x[:, 1])
 
     return x
 

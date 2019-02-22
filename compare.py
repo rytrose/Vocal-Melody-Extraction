@@ -13,6 +13,7 @@ if __name__ == '__main__':
 
     cnn_data = np.loadtxt("out_seg.txt")
     cnn_data = cnn_data[:, 1]
+    np.place(cnn_data, cnn_data <= 0, np.nan)
 
 
     start_stops = [[n.start, n.end] for n in midi.instruments[0].notes]
@@ -36,7 +37,6 @@ if __name__ == '__main__':
 
     midi_data_interp = np.interp(melodia_timestamps, time, midi_freqs)
     cnn_data_interp = np.interp(melodia_timestamps, np.linspace(0, length, cnn_data.shape[0]), cnn_data)
-    np.place(cnn_data_interp, cnn_data_interp <= 4000, np.nan)
 
     plt.plot(melodia_timestamps, melodia_data)
     plt.plot(melodia_timestamps, cnn_data_interp)

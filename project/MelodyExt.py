@@ -138,8 +138,7 @@ def CFP_filterbank(x, fr, fs, Hop, h, fc, tc, g, NumPerOctave):
 
     return tfrL0, tfrLF, tfrLQ, f, q, t, central_frequencies 
 
-def feature_extraction(filename):
-    x, fs = sf.read(filename)
+def feature_extraction(x, fs):
     if len(x.shape)>1:
        x = np.mean(x, axis = 1)
     #x = x[:3*fs]
