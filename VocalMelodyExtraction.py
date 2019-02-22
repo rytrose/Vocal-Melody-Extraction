@@ -66,6 +66,9 @@ def main():
     parser.add_argument('-of', '--output_file',
                         help='output file name (default: %(default)s',
                         type=str, default='out_seg')
+    parser.add_argument('-j', '--jetson',
+                        help='jetson flag (limit memory use)',
+                        action='store_true', default=False)
 
     args = parser.parse_args()
     print(args)
@@ -105,14 +108,36 @@ def main():
         song = args.input_file
         x, fs = sf.read(song)
         results = None
-        sample_ptr = 0
-        while sample_ptr < x.shape[0]:
-            chunk_end = min(sample_ptr + MAX_LEN, x.shape[0] - 1)
-            chunk = x[sample_ptr:chunk_end, :]
-            sample_ptr += MAX_LEN
+        if args.jetson:
+            sample_ptr = 0
+            while sample_ptr < x.shape[0]:
+                chunk_end = min(sample_ptr + MAX_LEN, x.shape[0] - 1)
+                chunk = x[sample_ptr:chunk_end, :]
+                sample_ptr += MAX_LEN
 
+                # Feature extraction
+                feature = feature_extraction(chunk, fs)
+                feature = np.transpose(feature[0:4], axes=(2, 1, 0))
+
+                # load model
+                model = load_model(args.model_path)
+
+                # Inference
+                print(feature[:, :, 0].shape)
+                extract_result = inference(feature= feature[:, :, 0],
+                                           model = model,
+                                           batch_size=args.batch_size_test)
+
+                # Output
+                r = matrix_parser(extract_result)
+
+                if results is None:
+                    results = r
+                else:
+                    results = np.concatenate((results, r))
+        else:
             # Feature extraction
-            feature = feature_extraction(chunk, fs)
+            feature = feature_extraction(x, fs)
             feature = np.transpose(feature[0:4], axes=(2, 1, 0))
 
             # load model
@@ -120,19 +145,14 @@ def main():
 
             # Inference
             print(feature[:, :, 0].shape)
-            extract_result = inference(feature= feature[:, :, 0],
-                                       model = model,
+            extract_result = inference(feature=feature[:, :, 0],
+                                       model=model,
                                        batch_size=args.batch_size_test)
 
             # Output
-            r = matrix_parser(extract_result)
+            results = matrix_parser(extract_result)
 
-            if results is None:
-                results = r
-            else:
-                results = np.concatenate((results, r))
-
-            np.savetxt(args.output_file + ".txt", results)
+        np.savetxt(args.output_file + ".txt", results)
         print("FINISHED")
 
 
