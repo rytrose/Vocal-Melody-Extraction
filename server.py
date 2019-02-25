@@ -1,6 +1,9 @@
 from flask import Flask, request
 from werkzeug.utils import secure_filename
 from werkzeug.serving import run_simple
+from run_melodia import run_melodia
+import VocalMelodyExtraction
+from project.utils import load_model
 import requests
 import threading
 import os.path as op
@@ -9,6 +12,13 @@ import time
 app = Flask(__name__)
 
 ALLOWED_EXTENSIONS = {'wav'}
+MODEL_PATH = "pretrained_models/Seg"
+
+
+
+class Struct:
+    def __init__(self, **entries):
+        self.__dict__.update(entries)
 
 
 def allowed_file(filename):
@@ -31,10 +41,31 @@ def process_route():
 
 def extract_audio(filename):
     print("Processing %s..." % filename)
-    shimi_url = "http://localhost:5001/receive"
-    files = {'file': open("test.txt", "rb")}
-    res = requests.post(shimi_url, files=files)
-    print("Sent file.", res.status_code)
+    name = "_".join(filename.split('/')[-1].split('.')[:-1])
+
+    # Run melodia
+    run_melodia(op.join("audio_files", filename), op.join("melodia_outputs", "melodia_" + name + ".p"))
+
+    # Run deep learning
+    args = {
+        "model_path": MODEL_PATH,
+        "input_file": filename,
+        "batch_size_test": 40,
+        "output_file": op.join("cnn_outputs", "cnn_" + name),
+        "jetson": False
+    }
+    args_struct = Struct(**args)
+    VocalMelodyExtraction.testing(args_struct)
+
+    shimi_cnn_url = "http://localhost:5001/receive_cnn"
+    files = {'file': open(op.join("cnn_outputs", "cnn_" + name + ".txt"), "rb")}
+    res = requests.post(shimi_cnn_url, files=files)
+    print("Sent cnn file.", res.status_code)
+
+    shimi_melodia_url = "http://localhost:5001/receive_melodia"
+    files = {'file': open(op.join("melodia_outputs", "melodia_" + name + ".p"), "rb")}
+    res = requests.post(shimi_melodia_url, files=files)
+    print("Sent melodia file.", res.status_code)
 
 
 if __name__ == '__main__':
