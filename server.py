@@ -1,4 +1,4 @@
-from flask import Flask, request
+from flask import Flask, request, send_from_directory
 from werkzeug.utils import secure_filename
 from werkzeug.serving import run_simple
 from run_melodia import run_melodia
@@ -16,6 +16,7 @@ app = Flask(__name__)
 ALLOWED_EXTENSIONS = {'wav'}
 MODEL_PATH = "pretrained_models/Seg"
 OUTPUTS_PATH = "/media/ashis/data/rytrose/melody_extraction"
+DATASET_PATH = "/media/ashis/data/rytrose/Lakh_MIDI"
 
 
 class Struct:
@@ -23,30 +24,84 @@ class Struct:
         self.__dict__.update(entries)
 
 
+def msd_id_to_dirs(msd_id):
+    """Given an MSD ID, generate the path prefix.
+    e.g. TRABCD12345678 -> A/B/C/TRABCD12345678"""
+    return op.join(msd_id[2], msd_id[3], msd_id[4], msd_id)
+
+
+def msd_id_to_mp3(msd_id):
+    """Given an MSD ID, return the path to the corresponding mp3"""
+    return op.join(DATASET_PATH, 'lmd_matched_mp3', msd_id_to_dirs(msd_id) + '.mp3')
+
+
+def msd_id_to_wav(msd_id):
+    """Given an MSD ID, return the path to the corresponding mp3"""
+    return op.join(DATASET_PATH, 'lmd_matched_mp3', msd_id_to_dirs(msd_id) + '.wav')
+
+
+def msd_id_to_cnn(msd_id):
+    """Given an MSD ID, return the path to its cnn processed melody extraction file"""
+    return op.join(OUTPUTS_PATH, 'cnn_outputs', 'cnn_' + msd_id + '.txt')
+
+
+def msd_id_to_melodia(msd_id):
+    """Given an MSD ID, return the path to its cnn processed melody extraction file"""
+    return op.join(OUTPUTS_PATH, 'melodia_outputs', 'melodia_' + msd_id + '.p')
+
+
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
-@app.route("/process", methods=['POST'])
-def process_route():
-    if 'file' not in request.files:
-        return '', 400
-    file = request.files['file']
-    if file.filename == '':
-        return '', 400
-    if file and allowed_file(file.filename):
-        filename = secure_filename(file.filename)
-        file.save(op.join("audio_files", filename))
-        threading.Thread(target=extract_audio, args=(filename,)).start()
-        return '', 201
+@app.route("/fetch/audio/<msdid>", methods=['GET'])
+def fetch_audio(msdid):
+    msd_id = msdid
+    wav_path = msd_id_to_wav(msd_id)
+    if not op.exists(wav_path):
+        return 'No file exists at %s' % wav_path, 400
+
+    split = wav_path.split("/")
+    path = "/".join(split[:-1])
+    filename = split[-1]
+
+    return send_from_directory(path, filename)
 
 
-def extract_audio(filename):
-    print("Processing %s..." % filename)
-    name = "_".join(filename.split('/')[-1].split('.')[:-1])
+@app.route("/fetch/cnn/<msdid>", methods=['GET'])
+def fetch_cnn(msdid):
+    msd_id = msdid
+    cnn_path = msd_id_to_cnn(msd_id)
+    if not op.exists(cnn_path):
+        return 'No file exists at %s' % cnn_path, 400
 
-    mp3_path = filename
-    wav_path = ".".join(filename.split('.')[:-1] + ['wav'])
+    split = cnn_path.split("/")
+    path = "/".join(split[:-1])
+    filename = split[-1]
+
+    return send_from_directory(path, filename)
+
+
+@app.route("/fetch/melodia/<msdid>", methods=['GET'])
+def fetch_melodia(msdid):
+    msd_id = msdid
+    melodia_path = msd_id_to_melodia(msd_id)
+    if not op.exists(melodia_path):
+        return 'No file exists at %s' % melodia_path, 400
+
+    split = melodia_path.split("/")
+    path = "/".join(split[:-1])
+    filename = split[-1]
+
+    return send_from_directory(path, filename)
+
+
+def extract_audio(msd_id):
+    print("Processing %s..." % msd_id)
+    name = msd_id
+
+    mp3_path = msd_id_to_mp3(msd_id)
+    wav_path = msd_id_to_wav(msd_id)
 
     if not op.exists(wav_path):
         command_string = "ffmpeg -i %s %s" % (mp3_path, wav_path)
@@ -68,16 +123,6 @@ def extract_audio(filename):
     }
     args_struct = Struct(**args)
     VocalMelodyExtraction.testing(args_struct)
-
-    # shimi_cnn_url = "http://localhost:5001/receive_cnn"
-    # files = {'file': open(op.join(OUTPUTS_PATH, "cnn_outputs", "cnn_" + name + ".txt"), "rb")}
-    # res = requests.post(shimi_cnn_url, files=files)
-    # print("Sent cnn file.", res.status_code)
-    #
-    # shimi_melodia_url = "http://localhost:5001/receive_melodia"
-    # files = {'file': open(op.join(OUTPUTS_PATH, "melodia_outputs", "melodia_" + name + ".p"), "rb")}
-    # res = requests.post(shimi_melodia_url, files=files)
-    # print("Sent melodia file.", res.status_code)
 
 
 if __name__ == '__main__':
