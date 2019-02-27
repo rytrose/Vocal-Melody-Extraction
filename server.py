@@ -96,6 +96,18 @@ def fetch_melodia(msdid):
     return send_from_directory(path, filename)
 
 
+@app.route("/process/<msdid>", methods=['GET'])
+def process_msd_id(msdid):
+    msd_id = msdid
+
+    mp3_path = msd_id_to_mp3(msd_id)
+    if not op.exists(mp3_path):
+        return 'No msd_id %s found' % msd_id, 400
+
+    threading.Thread(target=extract_audio, args=(msd_id,)).start()
+    return 'Processing started.', 201
+
+
 def extract_audio(msd_id):
     print("Processing %s..." % msd_id)
     name = msd_id
@@ -123,6 +135,8 @@ def extract_audio(msd_id):
     }
     args_struct = Struct(**args)
     VocalMelodyExtraction.testing(args_struct)
+
+    r = requests.post("http://shimi-webapp-server.serveo.net/processed", json={'msdId': msd_id})
 
 
 if __name__ == '__main__':
